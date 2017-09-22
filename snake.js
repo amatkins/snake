@@ -26,6 +26,10 @@ function Snake() {
   document.body.appendChild(this.canvas);
   this.ctx = this.canvas.getContext("2d");
 
+  this.textBox = document.createElement("p");
+  this.textBox.innerHTML = "Paused, Points: " + this.score;
+  document.body.appendChild(this.textBox);
+
   window.onkeydown = this.handleKeyDown(this);
 
   this.render();
@@ -61,6 +65,7 @@ Snake.prototype = {
           else {
             self.state = "running";
             self.loopID = setInterval(() => self.loop(), self.speed);
+            self.textBox.innerHTML = "Running, Points: " + self.score;
           }
           break;
       }
@@ -213,7 +218,7 @@ Snake.prototype = {
       return;
     }
 
-    for (var i = 0; i < this.food.length; i++) {
+    for (let i = 0; i < this.food.length; i++) {
       if (this.food[i].x === x && this.food[i].y === y) {
         ate = true;
         this.score += this.food[i].value;
@@ -236,6 +241,8 @@ Snake.prototype = {
         this.canvas.width = this.width * this.cellSize;
         this.canvas.height = this.height * this.cellSize;
       }
+
+      this.textBox.innerHTML = "Running, Points: " + this.score;
     } else
       this.snake.pop();
 
@@ -257,6 +264,7 @@ Snake.prototype = {
         break;
       case "pause":
         clearInterval(this.loopID);
+        this.textBox.innerHTML = "Paused, Points: " + this.score;
         break;
       case "over":
         clearInterval(this.loopID);
