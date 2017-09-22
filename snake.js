@@ -13,8 +13,10 @@ function Snake() {
   this.direction = "right";
   this.nextDir = "right";
   this.food = [];
-  this.running = true;
-  this.reset = false;
+  this.foodTypes = [{ value:1, color:"blue" }, { value:3, color:"green" }, { value:5, color:"yellow" }];
+  this.score = 0;
+  // running, pause, reset, over
+  this.state = "pause";
   this.speed = 1000;
   this.maxSpeed = 150;
 
@@ -26,7 +28,7 @@ function Snake() {
 
   window.onkeydown = this.handleKeyDown(this);
 
-  this.loopID = setInterval(() => this.loop(), this.speed);
+  this.render();
 }
 
 Snake.prototype = {
@@ -52,6 +54,14 @@ Snake.prototype = {
         case 'D':
           if (self.direction !== "left")
             self.nextDir = "right";
+          break;
+        case 'P':
+          if (self.state === "running")
+            self.state = "pause";
+          else {
+            self.state = "running";
+            self.loopID = setInterval(() => self.loop(), self.speed);
+          }
           break;
       }
     }
@@ -148,8 +158,8 @@ Snake.prototype = {
     });
 
     // draw bug
-    this.ctx.fillStyle = "green";
     this.food.forEach((food) => {
+      this.ctx.fillStyle = food.color;
       this.ctx.fillRect(food.x * this.cellSize,
         food.y * this.cellSize,
         this.cellSize,
@@ -160,7 +170,7 @@ Snake.prototype = {
   /** @function placeFood
    *  Places a pellet of food in a position that doesn't have a pellet or snake segment.
    */
-  placeFood: function() {
+  placeFood: function(value, color) {
     var x = Math.floor(Math.random() * (this.width - 2) + 1);
     var y = Math.floor(Math.random() * (this.height - 2) + 1);
 
@@ -169,7 +179,7 @@ Snake.prototype = {
       y = Math.floor(Math.random() * (this.height - 2) + 1);
     }
 
-    this.food.push({ x:x, y:y });
+    this.food.push({ x:x, y:y, value:value, color:color });
   },
 
   /** @function update
@@ -199,14 +209,15 @@ Snake.prototype = {
     }
 
     if (x < 0 || x >= this.width || y < 0 || y >= this.height || this.snake.find((segment) => {return segment.x === x && segment.y === y;})) {
-      this.running = false;
+      this.state = "over";
       return;
     }
 
     for (var i = 0; i < this.food.length; i++) {
       if (this.food[i].x === x && this.food[i].y === y) {
         ate = true;
-        this.food.splice(i, 1);
+        this.score += this.food[i].value;
+        this.food = [];
         break;
       }
     }
@@ -215,7 +226,7 @@ Snake.prototype = {
     if (ate) {
       if (this.speed > this.maxSpeed) {
         this.speed -= 50;
-        this.reset = true;
+        this.state = "reset";
       }
       if (this.snake.length % 10 == 0) {
         if (this.width < this.widthMax)
@@ -229,7 +240,9 @@ Snake.prototype = {
       this.snake.pop();
 
     if (this.food.length === 0)
-      this.placeFood();
+      this.foodTypes.forEach((food) => {
+        this.placeFood(food.value, food.color);
+      });
   },
 
   /** @function loop
@@ -239,13 +252,22 @@ Snake.prototype = {
     this.update();
     this.render();
 
-    if (!this.running) {
-      clearInterval(this.loopID);
-      document.body.removeChild(this.canvas);
-      new Snake();
-    } else if (this.reset) {
-      clearInterval(this.loopID);
-      this.loopID = setInterval(() => this.loop(), this.speed);
+    switch (this.state) {
+      case "running":
+        break;
+      case "pause":
+        clearInterval(this.loopID);
+        break;
+      case "over":
+        clearInterval(this.loopID);
+        document.body.removeChild(this.canvas);
+        new Snake();
+        break;
+      case "reset":
+        clearInterval(this.loopID);
+        this.state = "running";
+        this.loopID = setInterval(() => this.loop(), this.speed);
+        break;
     }
   }
 };
