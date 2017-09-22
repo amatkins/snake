@@ -5,23 +5,28 @@ function Snake() {
   var self = this;
 
   this.cellSize = 10;
-  this.width = 15;
+  this.width = 21;
+  this.widthMax = 35
   this.height = 15;
-  this.snake = [{ x:8, y:8 }, { x:7, y:8 }, { x:6, y:8 }];
+  this.heightMax = 29;
+  this.snake = [{ x:11, y:8 }, { x:10, y:8 }, { x:9, y:8 }];
   this.direction = "right";
   this.nextDir = "right";
   this.food = [];
   this.running = true;
+  this.reset = false;
+  this.speed = 1000;
+  this.maxSpeed = 150;
 
-  var canvas = document.createElement("canvas");
-  canvas.width = this.width * this.cellSize;
-  canvas.height = this.height * this.cellSize;
-  document.body.appendChild(canvas);
-  this.ctx = canvas.getContext("2d");
+  this.canvas = document.createElement("canvas");
+  this.canvas.width = this.width * this.cellSize;
+  this.canvas.height = this.height * this.cellSize;
+  document.body.appendChild(this.canvas);
+  this.ctx = this.canvas.getContext("2d");
 
   window.onkeydown = this.handleKeyDown(this);
 
-  this.loopID = setInterval(() => this.loop(), 1000);
+  this.loopID = setInterval(() => this.loop(), this.speed);
 }
 
 Snake.prototype = {
@@ -51,15 +56,87 @@ Snake.prototype = {
       }
     }
   },
+
+  /** @function drawLine
+   *  Draws a line from the starting position to the ending position.
+   *  @param  {Integer} sX The starting x position.
+   *  @param  {Integer} sY The starting y position.
+   *  @param  {Integer} eX The ending x position.
+   *  @param  {Integer} eY The ending y position.
+   */
+  drawLine: function(sX, sY, eX, eY) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(sX, sY);
+    this.ctx.lineTo(eX, eY);
+    this.ctx.stroke();
+  },
+
   /** @function render
    *  Renders the snake segments and food pellets
    */
   render: function() {
+    var startX;
+    var startY;
+    var endX;
+    var endY;
+
     // fill screen
     this.ctx.fillStyle = "black";
     this.ctx.fillRect(0, 0,
       this.width * this.cellSize,
       this.height * this.cellSize);
+
+      this.ctx.strokeStyle = "white"
+      switch(this.direction) {
+        case "up":
+          startX = (this.snake[0].x) * this.cellSize + 1;
+          startY = (this.snake[0].y) * this.cellSize + 1;
+          endX = startX;
+          endY = 0;
+          this.drawLine(startX, startY, endX, endY);
+          startX = (this.snake[0].x + 1) * this.cellSize - 1;
+          startY = (this.snake[0].y + 1) * this.cellSize - 1;
+          endX = startX;
+          endY = 0;
+          this.drawLine(startX, startY, endX, endY);
+          break;
+        case "left":
+          startX = (this.snake[0].x) * this.cellSize + 1;
+          startY = (this.snake[0].y) * this.cellSize + 1;
+          endX = 0;
+          endY = startY;
+          this.drawLine(startX, startY, endX, endY);
+          startX = (this.snake[0].x + 1) * this.cellSize - 1;
+          startY = (this.snake[0].y + 1) * this.cellSize - 1;
+          endX = 0;
+          endY = startY;
+          this.drawLine(startX, startY, endX, endY);
+          break;
+        case "down":
+          startX = (this.snake[0].x) * this.cellSize + 1;
+          startY = (this.snake[0].y) * this.cellSize + 1;
+          endX = startX;
+          endY = this.height * this.cellSize - 1;
+          this.drawLine(startX, startY, endX, endY);
+          startX = (this.snake[0].x + 1) * this.cellSize - 1;
+          startY = (this.snake[0].y + 1) * this.cellSize - 1;
+          endX = startX;
+          endY = this.height * this.cellSize - 1;
+          this.drawLine(startX, startY, endX, endY);
+          break;
+        case "right":
+          startX = (this.snake[0].x) * this.cellSize + 1;
+          startY = (this.snake[0].y) * this.cellSize + 1;
+          endX = this.width * this.cellSize - 1;
+          endY = startY;
+          this.drawLine(startX, startY, endX, endY);
+          startX = (this.snake[0].x + 1) * this.cellSize - 1;
+          startY = (this.snake[0].y + 1) * this.cellSize - 1;
+          endX = this.width * this.cellSize - 1;
+          endY = startY;
+          this.drawLine(startX, startY, endX, endY);
+          break;
+      }
 
     // draw snake
     this.ctx.fillStyle = "red";
@@ -79,12 +156,29 @@ Snake.prototype = {
         this.cellSize);
     });
   },
+
+  /** @function placeFood
+   *  Places a pellet of food in a position that doesn't have a pellet or snake segment.
+   */
+  placeFood: function() {
+    var x = Math.floor(Math.random() * (this.width - 2) + 1);
+    var y = Math.floor(Math.random() * (this.height - 2) + 1);
+
+    while (this.snake.find((segment) => {return segment.x === x && segment.y === y;}) || this.food.find((pellet) => {return pellet.x === x && pellet.y === y;})) {
+      x = Math.floor(Math.random() * (this.width - 2) + 1);
+      y = Math.floor(Math.random() * (this.height - 2) + 1);
+    }
+
+    this.food.push({ x:x, y:y });
+  },
+
   /** @function update
    *  Updates snake as it moves.
    */
   update: function() {
     var x = this.snake[0].x;
     var y = this.snake[0].y;
+    var ate = false;
 
     if (this.nextDir !== this.direction)
       this.direction = this.nextDir;
@@ -104,14 +198,40 @@ Snake.prototype = {
         break;
     }
 
-    if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
+    if (x < 0 || x >= this.width || y < 0 || y >= this.height || this.snake.find((segment) => {return segment.x === x && segment.y === y;})) {
       this.running = false;
       return;
     }
 
-    this.snake.pop();
+    for (var i = 0; i < this.food.length; i++) {
+      if (this.food[i].x === x && this.food[i].y === y) {
+        ate = true;
+        this.food.splice(i, 1);
+        break;
+      }
+    }
+
     this.snake.unshift({ x:x, y:y });
+    if (ate) {
+      if (this.speed > this.maxSpeed) {
+        this.speed -= 50;
+        this.reset = true;
+      }
+      if (this.snake.length % 10 == 0) {
+        if (this.width < this.widthMax)
+          this.width++;
+        if (this.height < this.heightMax)
+          this.height++;
+        this.canvas.width = this.width * this.cellSize;
+        this.canvas.height = this.height * this.cellSize;
+      }
+    } else
+      this.snake.pop();
+
+    if (this.food.length === 0)
+      this.placeFood();
   },
+
   /** @function loop
    *  Runs a loop of updating and rendering the game, ends the loop if the end condition has been met.
    */
@@ -121,7 +241,11 @@ Snake.prototype = {
 
     if (!this.running) {
       clearInterval(this.loopID);
+      document.body.removeChild(this.canvas);
       new Snake();
+    } else if (this.reset) {
+      clearInterval(this.loopID);
+      this.loopID = setInterval(() => this.loop(), this.speed);
     }
   }
 };
