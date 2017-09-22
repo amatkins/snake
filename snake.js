@@ -15,7 +15,7 @@ function Snake() {
   this.food = [];
   this.foodTypes = [{ value:1, color:"blue" }, { value:3, color:"green" }, { value:5, color:"yellow" }];
   this.score = 0;
-  // running, pause, reset, over
+  // running, pause, refresh, over, reset
   this.state = "pause";
   this.speed = 1000;
   this.maxSpeed = 150;
@@ -60,12 +60,16 @@ Snake.prototype = {
             self.nextDir = "right";
           break;
         case 'P':
-          if (self.state === "running")
-            self.state = "pause";
-          else {
-            self.state = "running";
-            self.loopID = setInterval(() => self.loop(), self.speed);
-            self.textBox.innerHTML = "Running, Points: " + self.score;
+          switch (self.state) {
+            case "running":
+              self.pause();
+              break;
+            case "pause":
+              self.unpause();
+              break;
+            case "over":
+              self.reset();
+              break;
           }
           break;
       }
@@ -223,7 +227,6 @@ Snake.prototype = {
         ate = true;
         this.score += this.food[i].value;
         this.food = [];
-        break;
       }
     }
 
@@ -231,7 +234,7 @@ Snake.prototype = {
     if (ate) {
       if (this.speed > this.maxSpeed) {
         this.speed -= 50;
-        this.state = "reset";
+        this.state = "refresh";
       }
       if (this.snake.length % 10 == 0) {
         if (this.width < this.widthMax)
@@ -252,6 +255,24 @@ Snake.prototype = {
       });
   },
 
+  pause: function() {
+    this.state = "pause";
+    clearInterval(this.loopID);
+    this.textBox.innerHTML = "Paused, Points: " + this.score;
+  },
+
+  unpause: function() {
+    this.state = "running";
+    this.loopID = setInterval(() => this.loop(), this.speed);
+    this.textBox.innerHTML = "Running, Points: " + this.score;
+  },
+
+  reset: function() {
+    document.body.removeChild(this.canvas);
+    document.body.removeChild(this.textBox);
+    new Snake();
+  },
+
   /** @function loop
    *  Runs a loop of updating and rendering the game, ends the loop if the end condition has been met.
    */
@@ -263,18 +284,15 @@ Snake.prototype = {
       case "running":
         break;
       case "pause":
-        clearInterval(this.loopID);
-        this.textBox.innerHTML = "Paused, Points: " + this.score;
         break;
-      case "over":
-        clearInterval(this.loopID);
-        document.body.removeChild(this.canvas);
-        new Snake();
-        break;
-      case "reset":
+      case "refresh":
         clearInterval(this.loopID);
         this.state = "running";
         this.loopID = setInterval(() => this.loop(), this.speed);
+        break;
+      case "over":
+        clearInterval(this.loopID);
+        this.textBox.innerHTML = "Game Over, Points: " + this.score;
         break;
     }
   }
