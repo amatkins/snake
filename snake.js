@@ -11,25 +11,29 @@ function Controller(highScore) {
   this.highScore = highScore;
   this.snakes = [
     new Snake(Math.ceil(this.width/2)+3, Math.ceil(this.height/2), "right", "red", false),
-    new Snake(Math.ceil(this.width/2)-3, Math.ceil(this.height/2), "left", "purple", true)
+    new Snake(Math.ceil(this.width/2)-3, Math.ceil(this.height/2), "left", "purple", true, -10)
   ];
   this.food = [];
   this.foodTypes = [{ value:1, color:"blue" }, { value:3, color:"green" }, { value:5, color:"yellow" }];
   // running, pause, refresh, over, reset
   this.state = "pause";
-  this.speed = 1000;
-  this.maxSpeed = 200;
+  this.speed = 600;
+  this.maxSpeed = 175;
 
   this.canvas = document.createElement("canvas");
   this.canvas.width = this.width * this.cellSize;
   this.canvas.height = this.height * this.cellSize + 43;
   document.body.appendChild(this.canvas);
   this.ctx = this.canvas.getContext("2d");
-  this.ctx.font = "14px Arial";
+  this.ctx.font = "10px Arial";
 
   window.onkeydown = this.handleKeyDown(this);
 
+  this.foodTypes.forEach((food) => {
+    this.placeFood(food.value, food.color);
+  });
   this.render();
+  this.ctx.fillText(`Paused - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
 }
 
 Controller.prototype = {
@@ -112,13 +116,13 @@ Controller.prototype = {
     }
 
     // draw snakes
-    this.snakes.forEach((snake) => {
-      this.ctx.fillStyle = snake.color;
-      snake.segments.forEach((segment) => {
+    this.snakes.forEach((entity) => {
+      this.ctx.fillStyle = entity.color;
+      entity.segments.forEach((segment) => {
         this.ctx.fillRect(segment.x * this.cellSize, segment.y * this.cellSize,
           this.cellSize, this.cellSize);
       });
-      this.renderFace(snake);
+      this.renderFace(entity);
     });
 
     // draw food pellets
@@ -131,18 +135,18 @@ Controller.prototype = {
     });
 
     this.ctx.fillStyle = "orange";
-    this.ctx.fillText(`High Score: ${this.highScore}`, 10, (this.height + 1) * this.cellSize + 24);
+    this.ctx.fillText(`Your Score: ${this.snakes[0].score} - High Score: ${this.highScore} - Extra Lives: ${this.snakes[0].lives}`, 10, (this.height + 1) * this.cellSize + 24);
   },
 
   /** @function renderFace
    *  Renders a face on the front of the snake.
-   *  @param  {Snake} snake The snake object to render a face on.
+   *  @param  {Snake} entity The snake object to render a face on.
    */
-  renderFace: function(snake) {
-    var segment = snake.segments[0];
+  renderFace: function(entity) {
+    var segment = entity.segments[0];
 
     this.ctx.fillStyle = "white";
-    switch(snake.direction) {
+    switch(entity.direction) {
       case "up":
         this.ctx.fillRect(segment.x * this.cellSize + 1, (segment.y + 1) * this.cellSize - 3, 2, 2);
         this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, (segment.y + 1) * this.cellSize - 3, 2, 2);
@@ -169,8 +173,8 @@ Controller.prototype = {
     var x = Math.floor(Math.random() * (this.width - 2) + 1);
     var y = Math.floor(Math.random() * (this.height - 2) + 1);
 
-    while (this.snakes.find((snake) => {
-        return snake.segments.find((segment) => {
+    while (this.snakes.find((entity) => {
+        return entity.segments.find((segment) => {
           return segment.x === x && segment.y === y;
         });
       }) || this.food.find((pellet) => {
@@ -189,11 +193,10 @@ Controller.prototype = {
    *  @param  {Integer} sIndex The index of the snake to remove.
    */
   removeSnake: function(sIndex) {
-    if (this.snakes.reduce((sum, snake) => {
-      if (!snake.ai)
-        sum++;
-      return sum;
-    }, 0) === 1) {
+    if (this.snakes.filter((entity) => {return !entity.ai;}).length === 1
+      || ( this.snakes.filter((entity) => {return !entity.ai;}).length === 0
+      && this.snakes.length === 2)
+    ) {
       this.state = "over";
       return;
     }
@@ -206,7 +209,12 @@ Controller.prototype = {
    *  @param  {Integer} sIndex The index of the snake to replace.
    */
   replaceSnake(sIndex) {
-    var snake = this.snakes[sIndex];
+    let snake = this.snakes[sIndex];
+
+      this.width -= Math.trunc(snake.segments.length / 10);
+      this.height -= Math.trunc(snake.segments.length / 10);
+      this.canvas.width = this.width * this.cellSize;
+      this.canvas.height = this.height * this.cellSize + 43;
 
     this.snakes[sIndex] = new Snake(
       Math.ceil(this.width / 2),
@@ -219,35 +227,79 @@ Controller.prototype = {
     );
   },
 
-  /** @function moveAI
+  /** @function steerAI
    *  Calculates a move for the AI.
    *  @param  {Integer} sIndex The inde of the AI snake.
    */
-  moveAI: function(sIndex) {
-    var x, y, tail, pellet;
-
-    // Go towards food if possible
-    x = this.snakes[sIndex].segments[0].x;
-    y = this.snakes[sIndex].segments[0].y;
-    pellet = this.food.pop();
-
-    if (x > pellet.x && this.snakes[sIndex].direction !== "right") {
-      this.snakes[sIndex].nextDir = "left";
-    } else if (x < pellet.x && this.snakes[sIndex].direction !== "left") {
-      this.snakes[sIndex].nextDir = "right";
-    } else {
-      if (y > pellet.y && this.snakes[sIndex].direction !== "down") {
-        this.snakes[sIndex].nextDir = "up";
-      } else if (this.snakes[sIndex].direction !== "up") {
-        this.snakes[sIndex].nextDir = "down";
-      }
-    }
-
-    this.food.push(pellet);
+  steerAI: function(sIndex) {
+    var x, y,
+      dir = { up:true, left:true, down:true, right:true },
+      pellet = this.food[this.food.length - 1];
 
     for (let i = 0; i < 4; i++) {
       x = this.snakes[sIndex].segments[0].x;
       y = this.snakes[sIndex].segments[0].y;
+
+      if (x > pellet.x) {
+        if (this.snakes[sIndex].direction !== "right" && dir["left"])
+          this.snakes[sIndex].nextDir = "left";
+        else if (y > pellet.y && this.snakes[sIndex].direction !== "down" && dir["up"])
+          this.snakes[sIndex].nextDir = "up";
+        else if (y < pellet.y && this.snakes[sIndex].direction !== "up" && dir["down"])
+          this.snakes[sIndex].nextDir = "down";
+        else {
+          if (this.snakes[sIndex].direction !== "down" && dir["up"])
+            this.snakes[sIndex].nextDir = "up";
+          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
+            this.snakes[sIndex].nextDir = "down";
+          else
+            this.snakes[sIndex].nextDir = "right";
+        }
+      } else if (x < pellet.x) {
+        if (this.snakes[sIndex].direction !== "left" && dir["right"])
+          this.snakes[sIndex].nextDir = "right";
+        else if (y > pellet.y && this.snakes[sIndex].direction !== "down" && dir["up"])
+          this.snakes[sIndex].nextDir = "up";
+        else if (y < pellet.y && this.snakes[sIndex].direction !== "up" && dir["down"])
+          this.snakes[sIndex].nextDir = "down";
+        else {
+          if (this.snakes[sIndex].direction !== "down" && dir["up"])
+            this.snakes[sIndex].nextDir = "up";
+          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
+            this.snakes[sIndex].nextDir = "down";
+          else
+            this.snakes[sIndex].nextDir = "left";
+        }
+      } else {
+        if (y > pellet.y) {
+          if (this.snakes[sIndex].direction !== "down" && dir["up"])
+            this.snakes[sIndex].nextDir = "up";
+          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
+            this.snakes[sIndex].nextDir = "left";
+          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
+            this.snakes[sIndex].nextDir = "right";
+          else
+            this.snakes[sIndex].nextDir = "down";
+        } else if (y < pellet.y) {
+          if (this.snakes[sIndex].direction !== "up" && dir["down"])
+            this.snakes[sIndex].nextDir = "down";
+          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
+            this.snakes[sIndex].nextDir = "left";
+          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
+            this.snakes[sIndex].nextDir = "right";
+          else
+            this.snakes[sIndex].nextDir = "up";
+        } else {
+          if (this.snakes[sIndex].direction !== "down" && dir["up"])
+            this.snakes[sIndex].nextDir = "up";
+          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
+            this.snakes[sIndex].nextDir = "left";
+          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
+            this.snakes[sIndex].nextDir = "right";
+          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
+            this.snakes[sIndex].nextDir = "down";
+        }
+      }
 
       switch(this.snakes[sIndex].nextDir) {
         case "up":
@@ -264,63 +316,34 @@ Controller.prototype = {
           break;
       }
 
-      tail = this.snakes[sIndex].segments.pop();
-
       // Check if the direction it's headed is valid
-      if (x < 0 || x >= this.width || y < 0 || y >= this.height ||
+      if (
+        x < 0 || y < 0 || x >= this.width || y >= this.height ||
         this.snakes.find((entity) => {
           return entity.segments.find((segment) => {
             return segment.x === x && segment.y === y;
           });
         })
       ) {
-        // If not check another direction
-        switch(this.snakes[sIndex].nextDir) {
-          case "up":
-            if (this.snakes[sIndex].direction !== "right")
-              this.snakes[sIndex].nextDir = "left";
-            else
-              this.snakes[sIndex].nextDir = "down";
-            break;
-          case "left":
-            if (this.snakes[sIndex].direction !== "up")
-              this.snakes[sIndex].nextDir = "down";
-            else
-              this.snakes[sIndex].nextDir = "right";
-            break;
-          case "down":
-            if (this.snakes[sIndex].direction !== "left")
-              this.snakes[sIndex].nextDir = "right";
-            else
-              this.snakes[sIndex].nextDir = "up";
-            break;
-          case "right":
-            if (this.snakes[sIndex].direction !== "down")
-              this.snakes[sIndex].nextDir = "up";
-            else
-              this.snakes[sIndex].nextDir = "left";
-            break;
-        }
-        this.snakes[sIndex].segments.push(tail);
-      // If it is a valid direction choose that one
-      } else {
-        this.snakes[sIndex].segments.push(tail);
+        dir[this.snakes[sIndex].nextDir] = false;
+      } else
         return;
-      }
     }
   },
 
-  /** @function update
-   *  Updates snake as it moves.
+  /** @function moveSnakes
+   *  Moves all the snakes and checks if they've eaten food.
    */
-  update: function(sIndex) {
+  moveSnakes: function(sIndex, grow) {
     var x = this.snakes[sIndex].segments[0].x;
     var y = this.snakes[sIndex].segments[0].y;
     var ate = false;
 
+    // Update direction that snake is moving
     if (this.snakes[sIndex].nextDir !== this.snakes[sIndex].direction)
       this.snakes[sIndex].direction = this.snakes[sIndex].nextDir;
 
+    // Move snake in direction
     switch(this.snakes[sIndex].direction) {
       case "up":
         y--;
@@ -336,36 +359,27 @@ Controller.prototype = {
         break;
     }
 
-    var tail = this.snakes[sIndex].segments.pop();
-
-    if (x < 0 || x >= this.width || y < 0 || y >= this.height ||
-      this.snakes.find((entity) => {
-        return entity.segments.find((segment) => {
-          return segment.x === x && segment.y === y;
-        });
-      })
-    ) {
-      if (this.snakes[sIndex].ai || this.snakes[sIndex].lives > 0)
-        this.replaceSnake(sIndex);
-      else
-        this.removeSnake(sIndex);
-      return;
-    }
-
+    // Determine if snake has hit food
     for (let i = 0; i < this.food.length; i++) {
       if (this.food[i].x === x && this.food[i].y === y) {
-        ate = true;
         this.snakes[sIndex].score += this.food[i].value;
-        this.food = [];
+        grow.push(sIndex);
+        ate = true;
       }
     }
 
+    // Give snake head at new location
     this.snakes[sIndex].segments.unshift({ x:x, y:y });
+
+    // If the snake ate
     if (ate) {
+      // Increase speed
       if (this.speed > this.maxSpeed) {
-        this.speed -= 50;
+        this.speed -= 25;
         this.state = "refresh";
       }
+
+      // If threshold met, increase screen size
       if (this.snakes[sIndex].segments.length % 10 === 0) {
         if (this.width < this.widthMax)
           this.width++;
@@ -374,16 +388,52 @@ Controller.prototype = {
         this.canvas.width = this.width * this.cellSize;
         this.canvas.height = this.height * this.cellSize + 43;
       }
-      if ((this.snakes[sIndex].segments.length- 1) % (30 * Math.pow(2, this.snakes[sIndex].lives)) === 0)
-        this.snakes[sIndex].lives++;
 
-      this.snakes[sIndex].segments.push(tail);
+      // If threshold met, increase extra lives
+      if ((this.snakes[sIndex].segments.length- 1) % (30 * 2 ** this.snakes[sIndex].lives) === 0)
+        this.snakes[sIndex].lives++;
+    }
+    // Remove tail to maintain length if the snake did not eat
+    else
+      this.snakes[sIndex].segments.pop();
+
+    return grow;
+  },
+
+  /** @function checkHit
+   *  Checks if the snake has hit an obstacle.
+   *  @param  {Integer}  sIndex  The index of the snake that is being checked.
+   *  @param  {Array}    grow    The list of snakes that have grown.
+   *  @param  {Array}    die     The list of snakes that are already known to have died.
+   *  @return {Array}            The list of snakes that are currently known to have died.
+   */
+  checkHit: function(sIndex, grow, die) {
+    var head = this.snakes[sIndex].segments.shift();
+    var tails = {};
+
+    for (let i = 0; i < this.snakes.length; i++) {
+      if (!grow.includes(i))
+        tails[i] = this.snakes[i].segments.pop();
     }
 
-    if (this.food.length === 0)
-      this.foodTypes.forEach((food) => {
-        this.placeFood(food.value, food.color);
-      });
+    if (
+      head.x < 0 || head.y < 0 || head.x >= this.width || head.y >= this.height ||
+      this.snakes.find((entity) => {
+        return entity.segments.find((segment) => {
+          return segment.x === head.x && segment.y === head.y;
+        });
+      })
+    ) {
+      die.push(sIndex);
+    }
+
+    this.snakes[sIndex].segments.unshift(head);
+    for (let i = 0; i < this.snakes.length; i++) {
+      if (!grow.includes(i))
+        this.snakes[i].segments.push(tails[i]);
+    }
+
+    return die;
   },
 
   /** @function pause
@@ -393,7 +443,7 @@ Controller.prototype = {
     this.state = "pause";
     clearInterval(this.loopID);
     this.render();
-    this.ctx.fillText(`Paused, Points: ${this.snakes[0].score}, Lives: ${this.snakes[0].lives}`, 10, (this.height + 1) * this.cellSize + 5);
+    this.ctx.fillText(`Paused - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
   },
 
   /** @function unpause
@@ -403,7 +453,7 @@ Controller.prototype = {
     this.state = "running";
     this.loopID = setInterval(() => this.loop(), this.speed);
     this.render();
-    this.ctx.fillText(`Running, Points: ${this.snakes[0].score}, Lives: ${this.snakes[0].lives}`, 10, (this.height + 1) * this.cellSize + 5);
+    this.ctx.fillText(`Running - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
   },
 
   /** @function reset
@@ -419,13 +469,46 @@ Controller.prototype = {
    *  The loop is controlled by a state variable and is run with a speed variable.
    */
   loop: function() {
+    var grow = [],
+        die = [],
+        offset = 0;
+
+    // Steer the AI towards their goal.
     for (let i = 0; i < this.snakes.length; i++) {
       if (this.snakes[i].ai)
-        this.moveAI(i);
-      this.update(i);
+        this.steerAI(i);
     }
+
+    // Move snakes and determine if they grow.
+    for (let i = 0; i < this.snakes.length; i++) {
+      this.moveSnakes(i, grow);
+    }
+
+    // Check if they've hit an obstacle
+    for (let i = 0; i < this.snakes.length; i++) {
+      this.checkHit(i, grow, die);
+    }
+
+    // Kill snakes that did hit obstacle
+    die.forEach((death) => {
+      if (this.snakes[death].lives === 0) {
+        this.removeSnake(death - offset);
+        offset++;
+      } else
+        this.replaceSnake(death);
+    });
+
+    // Replace food if it was consumed
+    if (grow.length > 0) {
+      this.food = [];
+      this.foodTypes.forEach((foodType) => {
+        this.placeFood(foodType.value, foodType.color);
+      });
+    }
+
+    // Render world and info
     this.render();
-    this.ctx.fillText(`Running, Points: ${this.snakes[0].score}, Lives: ${this.snakes[0].lives}`, 10, (this.height + 1) * this.cellSize + 5);
+    this.ctx.fillText(`Running - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
 
     switch (this.state) {
       case "running":
@@ -440,7 +523,7 @@ Controller.prototype = {
       case "over":
         clearInterval(this.loopID);
         this.render();
-        this.ctx.fillText(`Game Over, Points: ${this.snakes[0].score}`, 10, (this.height + 1) * this.cellSize + 5);
+        this.ctx.fillText(`Game Over - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
         break;
     }
   }
