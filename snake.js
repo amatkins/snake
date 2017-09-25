@@ -10,8 +10,8 @@ function Controller(highScore) {
   this.heightMax = 37;
   this.highScore = highScore;
   this.snakes = [
-    new Snake(Math.ceil(this.width/2)+3, Math.ceil(this.height/2), "right", "red", false),
-    new Snake(Math.ceil(this.width/2)-3, Math.ceil(this.height/2), "left", "purple", true, -10)
+    new Snake({ x:Math.ceil(this.width/2)+3, y:Math.ceil(this.height/2), dir:"right" }, "red", { on:true, goalType:"closest" }, { extra:1, ignore:false }),
+    new Snake({ x:Math.ceil(this.width/2)-3, y:Math.ceil(this.height/2), dir:"left" }, "purple", { on:true, goalType:"max" }, { extra:0, ignore:true })
   ];
   this.food = [];
   this.foodTypes = [{ value:1, color:"blue" }, { value:3, color:"green" }, { value:5, color:"yellow" }];
@@ -32,6 +32,8 @@ function Controller(highScore) {
   this.foodTypes.forEach((food) => {
     this.placeFood(food.value, food.color);
   });
+  this.setGoals();
+
   this.render();
   this.ctx.fillText(`Paused - Interval: ${this.speed}`, 10, (this.height + 1) * this.cellSize + 5);
 }
@@ -87,6 +89,34 @@ Controller.prototype = {
     this.ctx.stroke();
   },
 
+  /** @function renderFace
+   *  Renders a face on the front of the snake.
+   *  @param  {Snake} entity The snake object to render a face on.
+   */
+  renderFace: function(entity) {
+    var segment = entity.segments[0];
+
+    this.ctx.fillStyle = "white";
+    switch(entity.dir.curr) {
+      case "up":
+        this.ctx.fillRect(segment.x * this.cellSize + 1, (segment.y + 1) * this.cellSize - 3, 2, 2);
+        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, (segment.y + 1) * this.cellSize - 3, 2, 2);
+        break;
+      case "left":
+        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, segment.y * this.cellSize + 1, 2, 2);
+        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, (segment.y + 1) * this.cellSize - 3, 2, 2);
+        break;
+      case "down":
+        this.ctx.fillRect(segment.x * this.cellSize + 1, segment.y * this.cellSize + 1, 2, 2);
+        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, segment.y * this.cellSize + 1, 2, 2);
+        break;
+      case "right":
+        this.ctx.fillRect(segment.x * this.cellSize + 1, segment.y * this.cellSize + 1, 2, 2);
+        this.ctx.fillRect(segment.x * this.cellSize + 1, (segment.y + 1) * this.cellSize - 3, 2, 2);
+        break;
+    }
+  },
+
   /** @function render
    *  Renders the snake segments and food pellets
    */
@@ -100,7 +130,7 @@ Controller.prototype = {
     this.ctx.strokeStyle = "white"
     var startX = this.snakes[0].segments[0].x * this.cellSize + this.cellSize / 2;
     var startY = this.snakes[0].segments[0].y * this.cellSize + this.cellSize / 2;
-    switch(this.snakes[0].direction) {
+    switch(this.snakes[0].dir.curr) {
       case "up":
         this.drawLine(startX, startY,startX, 0);
         break;
@@ -118,10 +148,12 @@ Controller.prototype = {
     // draw snakes
     this.snakes.forEach((entity) => {
       this.ctx.fillStyle = entity.color;
+
       entity.segments.forEach((segment) => {
         this.ctx.fillRect(segment.x * this.cellSize, segment.y * this.cellSize,
           this.cellSize, this.cellSize);
       });
+
       this.renderFace(entity);
     });
 
@@ -135,35 +167,7 @@ Controller.prototype = {
     });
 
     this.ctx.fillStyle = "orange";
-    this.ctx.fillText(`Your Score: ${this.snakes[0].score} - High Score: ${this.highScore} - Extra Lives: ${this.snakes[0].lives}`, 10, (this.height + 1) * this.cellSize + 24);
-  },
-
-  /** @function renderFace
-   *  Renders a face on the front of the snake.
-   *  @param  {Snake} entity The snake object to render a face on.
-   */
-  renderFace: function(entity) {
-    var segment = entity.segments[0];
-
-    this.ctx.fillStyle = "white";
-    switch(entity.direction) {
-      case "up":
-        this.ctx.fillRect(segment.x * this.cellSize + 1, (segment.y + 1) * this.cellSize - 3, 2, 2);
-        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, (segment.y + 1) * this.cellSize - 3, 2, 2);
-        break;
-      case "left":
-        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, segment.y * this.cellSize + 1, 2, 2);
-        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, (segment.y + 1) * this.cellSize - 3, 2, 2);
-        break;
-      case "down":
-        this.ctx.fillRect(segment.x * this.cellSize + 1, segment.y * this.cellSize + 1, 2, 2);
-        this.ctx.fillRect((segment.x + 1) * this.cellSize - 3, segment.y * this.cellSize + 1, 2, 2);
-        break;
-      case "right":
-        this.ctx.fillRect(segment.x * this.cellSize + 1, segment.y * this.cellSize + 1, 2, 2);
-        this.ctx.fillRect(segment.x * this.cellSize + 1, (segment.y + 1) * this.cellSize - 3, 2, 2);
-        break;
-    }
+    this.ctx.fillText(`Your Score: ${this.snakes[0].score} - High Score: ${this.highScore} - Extra Lives: ${this.snakes[0].lives.extra}`, 10, (this.height + 1) * this.cellSize + 24);
   },
 
   /** @function placeFood
@@ -193,8 +197,8 @@ Controller.prototype = {
    *  @param  {Integer} sIndex The index of the snake to remove.
    */
   removeSnake: function(sIndex) {
-    if (this.snakes.filter((entity) => {return !entity.ai;}).length === 1
-      || ( this.snakes.filter((entity) => {return !entity.ai;}).length === 0
+    if (this.snakes.filter((entity) => {return !entity.ai.on;}).length === 1
+      || ( this.snakes.filter((entity) => {return !entity.ai.on;}).length === 0
       && this.snakes.length === 2)
     ) {
       this.state = "over";
@@ -208,23 +212,52 @@ Controller.prototype = {
    *  Replaces a snake in the world at a predefined start point.
    *  @param  {Integer} sIndex The index of the snake to replace.
    */
-  replaceSnake(sIndex) {
+  replaceSnake(sIndex, total, offset) {
     let snake = this.snakes[sIndex];
 
-      this.width -= Math.trunc(snake.segments.length / 10);
-      this.height -= Math.trunc(snake.segments.length / 10);
-      this.canvas.width = this.width * this.cellSize;
-      this.canvas.height = this.height * this.cellSize + 43;
-
     this.snakes[sIndex] = new Snake(
-      Math.ceil(this.width / 2),
-      Math.ceil(this.height / 2),
-      snake.direction,
+      snake.spawn,
       snake.color,
       snake.ai,
-      snake.lives- 1,
+      { extra:snake.lives.extra - (snake.lives.ignore ? 0 : 1), ignore:snake.lives.ignore },
       snake.score
     );
+  },
+
+  /** @function findClosest
+   *  Returns the index of the food piece closes to the head of the provided snake.
+   *  @param  {Object} head     The head of the snake to use.
+   *  @return {Integer}         The index of the food pellet closest to the snake.
+   */
+  findClosest: function(head) {
+    var distances = [];
+
+    this.food.forEach((pellet) => {
+      distances.push(Math.abs(head.x - pellet.x) + Math.abs(head.y - pellet.y));
+    });
+
+    return distances.indexOf(Math.min.apply(null, distances));
+  },
+
+  /** @function setGoals
+   *  Sets the goals of each of the AI.
+   */
+  setGoals: function() {
+    this.snakes.forEach((entity) => {
+      if (entity.ai.on) {
+        switch (entity.ai.goalType) {
+          case "closest":
+            entity.ai.goal = this.findClosest(entity.segments[0]);
+            break;
+          case "max":
+            entity.ai.goal = this.food.length - 1;
+            break;
+          case "random":
+            entity.ai.goal = Math.round(Math.random() * this.food.length - 1);
+            break;
+        }
+      }
+    });
   },
 
   /** @function steerAI
@@ -233,75 +266,76 @@ Controller.prototype = {
    */
   steerAI: function(sIndex) {
     var x, y,
+      tail = this.snakes[sIndex].segments.pop(),
       dir = { up:true, left:true, down:true, right:true },
-      pellet = this.food[this.food.length - 1];
+      pellet = this.food[this.snakes[sIndex].ai.goal];
 
     for (let i = 0; i < 4; i++) {
       x = this.snakes[sIndex].segments[0].x;
       y = this.snakes[sIndex].segments[0].y;
 
       if (x > pellet.x) {
-        if (this.snakes[sIndex].direction !== "right" && dir["left"])
-          this.snakes[sIndex].nextDir = "left";
-        else if (y > pellet.y && this.snakes[sIndex].direction !== "down" && dir["up"])
-          this.snakes[sIndex].nextDir = "up";
-        else if (y < pellet.y && this.snakes[sIndex].direction !== "up" && dir["down"])
-          this.snakes[sIndex].nextDir = "down";
+        if (this.snakes[sIndex].dir.curr !== "right" && dir["left"])
+          this.snakes[sIndex].dir.next = "left";
+        else if (y > pellet.y && this.snakes[sIndex].dir.cur !== "down" && dir["up"])
+          this.snakes[sIndex].dir.next = "up";
+        else if (y < pellet.y && this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+          this.snakes[sIndex].dir.next = "down";
         else {
-          if (this.snakes[sIndex].direction !== "down" && dir["up"])
-            this.snakes[sIndex].nextDir = "up";
-          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
-            this.snakes[sIndex].nextDir = "down";
+          if (this.snakes[sIndex].dir.curr !== "down" && dir["up"])
+            this.snakes[sIndex].dir.next = "up";
+          else if (this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+            this.snakes[sIndex].dir.next = "down";
           else
-            this.snakes[sIndex].nextDir = "right";
+            this.snakes[sIndex].dir.next = "right";
         }
       } else if (x < pellet.x) {
-        if (this.snakes[sIndex].direction !== "left" && dir["right"])
-          this.snakes[sIndex].nextDir = "right";
-        else if (y > pellet.y && this.snakes[sIndex].direction !== "down" && dir["up"])
-          this.snakes[sIndex].nextDir = "up";
-        else if (y < pellet.y && this.snakes[sIndex].direction !== "up" && dir["down"])
-          this.snakes[sIndex].nextDir = "down";
+        if (this.snakes[sIndex].dir.curr !== "left" && dir["right"])
+          this.snakes[sIndex].dir.next = "right";
+        else if (y > pellet.y && this.snakes[sIndex].dir.curr !== "down" && dir["up"])
+          this.snakes[sIndex].dir.next = "up";
+        else if (y < pellet.y && this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+          this.snakes[sIndex].dir.next = "down";
         else {
-          if (this.snakes[sIndex].direction !== "down" && dir["up"])
-            this.snakes[sIndex].nextDir = "up";
-          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
-            this.snakes[sIndex].nextDir = "down";
+          if (this.snakes[sIndex].dir.curr !== "down" && dir["up"])
+            this.snakes[sIndex].dir.next = "up";
+          else if (this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+            this.snakes[sIndex].dir.next = "down";
           else
-            this.snakes[sIndex].nextDir = "left";
+            this.snakes[sIndex].dir.next = "left";
         }
       } else {
         if (y > pellet.y) {
-          if (this.snakes[sIndex].direction !== "down" && dir["up"])
-            this.snakes[sIndex].nextDir = "up";
-          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
-            this.snakes[sIndex].nextDir = "left";
-          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
-            this.snakes[sIndex].nextDir = "right";
+          if (this.snakes[sIndex].dir.curr !== "down" && dir["up"])
+            this.snakes[sIndex].dir.next = "up";
+          else if (this.snakes[sIndex].dir.curr !== "right" && dir["left"])
+            this.snakes[sIndex].dir.next = "left";
+          else if (this.snakes[sIndex].dir.curr !== "left" && dir["right"])
+            this.snakes[sIndex].dir.next = "right";
           else
-            this.snakes[sIndex].nextDir = "down";
+            this.snakes[sIndex].dir.next = "down";
         } else if (y < pellet.y) {
-          if (this.snakes[sIndex].direction !== "up" && dir["down"])
-            this.snakes[sIndex].nextDir = "down";
-          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
-            this.snakes[sIndex].nextDir = "left";
-          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
-            this.snakes[sIndex].nextDir = "right";
+          if (this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+            this.snakes[sIndex].dir.next = "down";
+          else if (this.snakes[sIndex].dir.curr !== "right" && dir["left"])
+            this.snakes[sIndex].dir.next = "left";
+          else if (this.snakes[sIndex].dir.curr !== "left" && dir["right"])
+            this.snakes[sIndex].dir.next = "right";
           else
-            this.snakes[sIndex].nextDir = "up";
+            this.snakes[sIndex].dir.next = "up";
         } else {
-          if (this.snakes[sIndex].direction !== "down" && dir["up"])
-            this.snakes[sIndex].nextDir = "up";
-          else if (this.snakes[sIndex].direction !== "right" && dir["left"])
-            this.snakes[sIndex].nextDir = "left";
-          else if (this.snakes[sIndex].direction !== "up" && dir["down"])
-            this.snakes[sIndex].nextDir = "right";
-          else if (this.snakes[sIndex].direction !== "left" && dir["right"])
-            this.snakes[sIndex].nextDir = "down";
+          if (this.snakes[sIndex].dir.curr !== "down" && dir["up"])
+            this.snakes[sIndex].dir.next = "up";
+          else if (this.snakes[sIndex].dir.curr !== "right" && dir["left"])
+            this.snakes[sIndex].dir.next = "left";
+          else if (this.snakes[sIndex].dir.curr !== "up" && dir["down"])
+            this.snakes[sIndex].dir.next = "right";
+          else if (this.snakes[sIndex].dir.curr !== "left" && dir["right"])
+            this.snakes[sIndex].dir.next = "down";
         }
       }
 
-      switch(this.snakes[sIndex].nextDir) {
+      switch(this.snakes[sIndex].dir.next) {
         case "up":
           y--;
           break;
@@ -325,9 +359,11 @@ Controller.prototype = {
           });
         })
       ) {
-        dir[this.snakes[sIndex].nextDir] = false;
-      } else
+        dir[this.snakes[sIndex].dir.next] = false;
+      } else {
+        this.snakes[sIndex].segments.push(tail);
         return;
+      }
     }
   },
 
@@ -340,11 +376,10 @@ Controller.prototype = {
     var ate = false;
 
     // Update direction that snake is moving
-    if (this.snakes[sIndex].nextDir !== this.snakes[sIndex].direction)
-      this.snakes[sIndex].direction = this.snakes[sIndex].nextDir;
+    this.snakes[sIndex].dir.curr = this.snakes[sIndex].dir.next;
 
     // Move snake in direction
-    switch(this.snakes[sIndex].direction) {
+    switch(this.snakes[sIndex].dir.curr) {
       case "up":
         y--;
         break;
@@ -390,8 +425,8 @@ Controller.prototype = {
       }
 
       // If threshold met, increase extra lives
-      if ((this.snakes[sIndex].segments.length- 1) % (30 * 2 ** this.snakes[sIndex].lives) === 0)
-        this.snakes[sIndex].lives++;
+      if (!this.snakes[sIndex].lives.ignore && (this.snakes[sIndex].segments.length- 1) % (30 * 2 ** this.snakes[sIndex].lives) === 0)
+        this.snakes[sIndex].lives.extra++;
     }
     // Remove tail to maintain length if the snake did not eat
     else
@@ -475,7 +510,7 @@ Controller.prototype = {
 
     // Steer the AI towards their goal.
     for (let i = 0; i < this.snakes.length; i++) {
-      if (this.snakes[i].ai)
+      if (this.snakes[i].ai.on)
         this.steerAI(i);
     }
 
@@ -491,11 +526,11 @@ Controller.prototype = {
 
     // Kill snakes that did hit obstacle
     die.forEach((death) => {
-      if (this.snakes[death].lives === 0) {
+      if (!this.snakes[death].lives.ignore && this.snakes[death].lives.extra === 0) {
         this.removeSnake(death - offset);
         offset++;
       } else
-        this.replaceSnake(death);
+        this.replaceSnake(death, die.length, offset);
     });
 
     // Replace food if it was consumed
@@ -504,6 +539,8 @@ Controller.prototype = {
       this.foodTypes.forEach((foodType) => {
         this.placeFood(foodType.value, foodType.color);
       });
+
+      this.setGoals();
     }
 
     // Render world and info
@@ -532,28 +569,28 @@ Controller.prototype = {
 /** @constructor Snake
  *  Constructs a new snake object.
  */
-function Snake(x, y, dir, color, ai, lives = 0, score = 0) {
-  this.segments = [{ x:x, y:y }];
-  switch (dir) {
+function Snake(spawn, color, ai = { on:false, goalType:"random", goal:0 }, lives = { extra:0, ignore:false }, score = 0) {
+  this.spawn = spawn;
+  this.segments = [{ x:spawn.x, y:spawn.y }];
+  switch (spawn.dir) {
     case "up":
-      this.segments.push({ x:x, y:y+1 });
-      this.segments.push({ x:x, y:y+2 });
+      this.segments.push({ x:spawn.x, y:spawn.y+1 });
+      this.segments.push({ x:spawn.x, y:spawn.y+2 });
       break;
     case "left":
-      this.segments.push({ x:x+1, y:y });
-      this.segments.push({ x:x+2, y:y });
+      this.segments.push({ x:spawn.x+1, y:spawn.y });
+      this.segments.push({ x:spawn.x+2, y:spawn.y });
       break;
     case "down":
-      this.segments.push({ x:x, y:y-1 });
-      this.segments.push({ x:x, y:y-2 });
+      this.segments.push({ x:spawn.x, y:spawn.y-1 });
+      this.segments.push({ x:spawn.x, y:spawn.y-2 });
       break;
     case "right":
-      this.segments.push({ x:x-1, y:y });
-      this.segments.push({ x:x-2, y:y });
+      this.segments.push({ x:spawn.x-1, y:spawn.y });
+      this.segments.push({ x:spawn.x-2, y:spawn.y });
       break;
   }
-  this.direction = dir;
-  this.nextDir = dir;
+  this.dir = { curr: spawn.dir, next:spawn.dir };
   this.color = color;
   this.ai = ai;
   this.lives = lives;
@@ -565,32 +602,32 @@ Snake.prototype = {
    *  Attempts to change the direction to "up".
    */
   inputUp: function() {
-    if (this.direction !== "down")
-      this.nextDir = "up";
+    if (this.dir.curr !== "down")
+      this.dir.next = "up";
   },
 
   /** @function inputLeft
    *  Attempts to change the direction to "left".
    */
   inputLeft: function() {
-    if (this.direction !== "right")
-      this.nextDir = "left";
+    if (this.dir.curr !== "right")
+      this.dir.next = "left";
   },
 
   /** @function inputDown
    *  Attempts to change the direction to "down".
    */
   inputDown: function() {
-    if (this.direction !== "up")
-      this.nextDir = "down";
+    if (this.dir.curr !== "up")
+      this.dir.next = "down";
   },
 
   /** @function inputRight
    *  Attempts to change the direction to "right".
    */
   inputRight: function() {
-    if (this.direction !== "left")
-      this.nextDir = "right";
+    if (this.dir.curr !== "left")
+      this.dir.next = "right";
   },
 };
 
