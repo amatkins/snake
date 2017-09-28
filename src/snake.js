@@ -53,13 +53,13 @@ export default class Snake {
     if (this.ai.on) {
       switch (this.ai.goalType) {
         case "closest":
-          entity.ai.goal = this.findClosest(food.loc);
+          this.ai.goal = this.findClosest(food.loc);
           break;
         case "max":
-          entity.ai.goal = food.length - 1;
+          this.ai.goal = food.loc.length - 1;
           break;
         case "random":
-          entity.ai.goal = Math.round(Math.random() * food.loc.length - 1);
+          this.ai.goal = Math.round(Math.random() * food.loc.length - 1);
           break;
       }
     }
@@ -106,7 +106,7 @@ export default class Snake {
       return false;
 
     this.dir.next = "right";
-    return false;
+    return true;
   }
 
   /** @function steerAI
@@ -118,7 +118,7 @@ export default class Snake {
       dir = { up:true, left:true, down:true, right:true },
       pellet = food[this.ai.goal];
 
-    for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
       x = this.segments[0].x;
       y = this.segments[0].y;
 
@@ -150,7 +150,7 @@ export default class Snake {
             this.dir.next = "down";
         } else if (y < pellet.y) {
           if (
-            !((dir["down"] && this.tryUp()) ||
+            !((dir["down"] && this.tryDown()) ||
             (dir["left"] && this.tryLeft()) ||
             (dir["right"] && this.tryRight()))
           )
@@ -160,7 +160,7 @@ export default class Snake {
             !((dir["up"] && this.tryUp()) ||
             (dir["right"] && this.tryRight()) ||
             (dir["down"] && this.tryDown()) ||
-            (dir["down"] && this.tryDown()))
+            (dir["left"] && this.tryLeft()))
           ) {
             this.segments.push(tail);
             return;
@@ -198,6 +198,7 @@ export default class Snake {
         return;
       }
     }
+    this.segments.push(tail);
   }
 
   /** @function updatePosition
@@ -208,7 +209,7 @@ export default class Snake {
     var y = this.segments[0].y;
 
     // Update direction that snake is moving
-    this.dir.curr = this..dir.next;
+    this.dir.curr = this.dir.next;
 
     // Move snake in direction
     switch(this.dir.curr) {
@@ -240,9 +241,9 @@ export default class Snake {
     var y = this.segments[0].y;
 
     // Determine if snake has hit food
-    for (let i = 0; i < food.length; i++) {
-      if (food.loc[i].x === x && food.loc[i].y === y) {
-        this.score += food.typ[i].value;
+    for (let j = 0; j < food.loc.length; j++) {
+      if (food.loc[j].x === x && food.loc[j].y === y) {
+        this.score += food.typ[j].value;
 
         if (!this.lives.ignore && (this.segments.length- 1) % (30 * 2 ** this.lives.extra) === 0)
           this.lives.extra++;
@@ -268,9 +269,9 @@ export default class Snake {
     var head = this.segments.shift();
     var tails = {};
 
-    for (let i = 0; i < snakes.length; i++) {
-      if (!grow.includes(i))
-        tails[i] = snakes[i].segments.pop();
+    for (let j = 0; j < snakes.length; j++) {
+      if (!grow.includes(j))
+        tails[j] = snakes[j].segments.pop();
     }
 
     if (
@@ -283,12 +284,18 @@ export default class Snake {
     ) {
       this.segments.unshift(head);
 
-      for (let i = 0; i < snakes.length; i++) {
-        if (!grow.includes(i))
-          snakes[i].segments.push(tails[i]);
+      for (let j = 0; j < snakes.length; j++) {
+        if (!grow.includes(j))
+          snakes[j].segments.push(tails[j]);
       }
 
       return true;
+    }
+    this.segments.unshift(head);
+
+    for (let j = 0; j < snakes.length; j++) {
+      if (!grow.includes(j))
+        snakes[j].segments.push(tails[j]);
     }
 
     return false;
@@ -300,7 +307,7 @@ export default class Snake {
    *  @param  {Integer} cellSize The size of each cell of the world.
    */
   render(ctx, cellSize) {
-    var head = entity.segments[0];
+    var head = this.segments[0];
 
     ctx.fillStyle = this.color;
 
@@ -345,28 +352,28 @@ export default class Snake {
 
     switch(this.dir.curr) {
       case "up":
-        this.ctx.beginPath();
-        this.ctx.moveTo(sX, sY);
-        this.ctx.lineTo(sX, 0);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sX, sY);
+        ctx.lineTo(sX, 0);
+        ctx.stroke();
         break;
       case "left":
-        this.ctx.beginPath();
-        this.ctx.moveTo(sX, sY);
-        this.ctx.lineTo(0, sY);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sX, sY);
+        ctx.lineTo(0, sY);
+        ctx.stroke();
         break;
       case "down":
-        this.ctx.beginPath();
-        this.ctx.moveTo(sX, sY);
-        this.ctx.lineTo(sX, height * cellSize - 1);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sX, sY);
+        ctx.lineTo(sX, height * cellSize - 1);
+        ctx.stroke();
         break;
       case "right":
-        this.ctx.beginPath();
-        this.ctx.moveTo(sX, sY);
-        this.ctx.lineTo(width * cellSize - 1, sY);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sX, sY);
+        ctx.lineTo(width * cellSize - 1, sY);
+        ctx.stroke();
         break;
     }
   }

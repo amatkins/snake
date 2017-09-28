@@ -1,0 +1,24 @@
+{
+  "name": "snake",
+  "version": "1.0.0",
+  "description": "A snake arcade game implementation.",
+  "main": "game.js",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amatkins/snake.git"
+  },
+  "author": "Anthony M. Atkinson",
+  "license": "THE UNLICENSE",
+  "bugs": {
+    "url": "https://github.com/amatkins/snake/issues"
+  },
+  "homepage": "https://github.com/amatkins/snake#readme",
+  "devDependencies": {
+    "react-scripts": "^1.0.13"
+  }
+}

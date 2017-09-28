@@ -19,7 +19,7 @@ export default class Bunch {
    *  Places one of each type of food in a place that is not currently occupied.
    */
   placeFood(snakes, width, height) {
-    this.types.forEach((foodType) => {
+    this.typ.forEach((foodType) => {
       var x = Math.floor(Math.random() * (width - 2) + 1);
       var y = Math.floor(Math.random() * (height - 2) + 1);
 
@@ -31,8 +31,8 @@ export default class Bunch {
           return pellet.x === x && pellet.y === y;
         })
       ) {
-        x = Math.floor(Math.random() * (this.width - 2) + 1);
-        y = Math.floor(Math.random() * (this.height - 2) + 1);
+        x = Math.floor(Math.random() * (width - 2) + 1);
+        y = Math.floor(Math.random() * (height - 2) + 1);
       }
 
       this.loc.push({ x:x, y:y });
@@ -45,11 +45,11 @@ export default class Bunch {
    *  @param  {Integer} cellSize The size of each cell in the world.
    */
   render(ctx, cellSize) {
-    for (let i = 0; i < this.typ.length; i++) {
-      ctx.fillStyle = this.typ[i].color;
+    for (let j = 0; j < this.typ.length; j++) {
+      ctx.fillStyle = this.typ[j].color;
 
-      this.ctx.fillRect(
-        this.loc[i].x * cellSize, this.loc[i].y * cellSize,
+      ctx.fillRect(
+        this.loc[j].x * cellSize, this.loc[j].y * cellSize,
         cellSize, cellSize
       );
     }
