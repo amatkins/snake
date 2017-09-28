@@ -177,8 +177,10 @@ export default class Controller {
             this.width++;
           if (this.height < this.heightMax)
             this.height++;
-          this.canvas.width = this.width * this.cellSize;
-          this.canvas.height = this.height * this.cellSize + 43;
+          this.screen.width = this.width * this.cellSize;
+          this.screen.height = this.height * this.cellSize + 43;
+          this.back.width = this.width * this.cellSize;
+          this.back.height = this.height * this.cellSize + 43;
         }
 
         grow.push(i);
