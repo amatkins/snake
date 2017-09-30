@@ -8,17 +8,29 @@ export default class Bunch {
     this.loc = [];
   }
 
-  /** @function clearFood
-   *  Clears the locations of all pieces of food.
+  /** @function eatFood
+   *  Eats the pellet if it is there.
+   *  @param x  The x coord to check.
+   *  @param y  The y coord to check.
+   *  @return   The food object if there is one.
    */
-  clearFood() {
-    this.loc = [];
+  eatFood(x, y) {
+    var index = this.loc.findIndex((pellet) => {
+      return pellet.x === x && pellet.y === y;
+    });
+
+    if (index < 0)
+      return undefined;
+
+    return this.typ[index];
   }
 
   /** @function placeFood
    *  Places one of each type of food in a place that is not currently occupied.
    */
   placeFood(snakes, width, height) {
+    this.loc = [];
+
     this.typ.forEach((foodType) => {
       var x = Math.floor(Math.random() * (width - 2) + 1);
       var y = Math.floor(Math.random() * (height - 2) + 1);
@@ -48,10 +60,9 @@ export default class Bunch {
     for (let j = 0; j < this.typ.length; j++) {
       ctx.fillStyle = this.typ[j].color;
 
-      ctx.fillRect(
-        this.loc[j].x * cellSize, this.loc[j].y * cellSize,
-        cellSize, cellSize
-      );
+      ctx.beginPath();
+      ctx.arc((this.loc[j].x + 0.5) * cellSize, (this.loc[j].y + 0.5) * cellSize, (cellSize / 2) - 2, 0, 2 * Math.PI, true);
+      ctx.fill();
     }
   }
 }

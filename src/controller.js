@@ -7,14 +7,14 @@ export default class Controller {
    *  @param {Integer}  highScore   The latest high score.
    */
   constructor(highScore) {
-    this.cellSize = 10;
+    this.cellSize = 15;
     this.width = 25;
     this.widthMax = 45
     this.height = 21;
     this.heightMax = 37;
     this.snakes = [
-      new Snake({ x:Math.ceil(this.width/2)+3, y:Math.ceil(this.height/2), dir:"right" }, "red", { on:false, goalType:"closest" }, { extra:1, ignore:false }),
-      new Snake({ x:Math.ceil(this.width/2)-3, y:Math.ceil(this.height/2), dir:"left" }, "purple", { on:true, goalType:"max" }, { extra:0, ignore:true })
+      new Snake({ x:Math.ceil(this.width/2)+2, y:Math.ceil(this.height/2), dir:"right" }, "red", { on:false, goalType:"closest" }, { extra:1, ignore:false }),
+      new Snake({ x:Math.ceil(this.width/2)-4, y:Math.ceil(this.height/2), dir:"left" }, "purple", { on:true, goalType:"last" }, { extra:0, ignore:true })
     ];
     this.food = new Bunch([{ value:1, color:"blue" }, { value:3, color:"green" }, { value:5, color:"yellow" }]);
     this.highScore = highScore;
@@ -33,49 +33,50 @@ export default class Controller {
     this.back.width = this.width * this.cellSize;
     this.back.height = this.height * this.cellSize + 43;
     this.backCTX = this.back.getContext("2d");
-    this.backCTX.font = "10px Arial";
+    this.backCTX.font = "12px Arial";
 
-    window.onkeydown = this.handleKeyDown(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+    window.onkeydown = this.handleKeyDown;
 
     this.food.placeFood(this.snakes, this.width, this.height);
     this.snakes.forEach((entity) => { entity.setGoal(this.food) });
 
-    this.render(`Paused - Interval: ${this.speed}`);
+    this.render(`Paused - Interval: ${this.speed}`, "To start the game hit [P].");
   }
 
   /** @function handleKeyDown
    *  Handles motion input of the snake.
    *  @param  {Object} event The key down event that was triggered.
    */
-  handleKeyDown(self) {
-    return function(event) {
-      switch (String.fromCharCode(event.keyCode)) {
-        case 'W':
-          self.snakes[0].tryUp();
-          break;
-        case 'A':
-          self.snakes[0].tryLeft();
-          break;
-        case 'S':
-          self.snakes[0].tryDown();
-          break;
-        case 'D':
-          self.snakes[0].tryRight();
-          break;
-        case 'P':
-          switch (self.state) {
-            case "running":
-              self.pause();
-              break;
-            case "paused":
-              self.unpause();
-              break;
-            case "over":
-              self.reset();
-              break;
-          }
-          break;
-      }
+  handleKeyDown(event) {
+    event.preventDefault();
+
+    switch (String.fromCharCode(event.keyCode)) {
+      case 'W':
+        this.snakes[0].tryUp();
+        break;
+      case 'A':
+        this.snakes[0].tryLeft();
+        break;
+      case 'S':
+        this.snakes[0].tryDown();
+        break;
+      case 'D':
+        this.snakes[0].tryRight();
+        break;
+      case 'P':
+        switch (this.state) {
+          case "running":
+            this.pause();
+            break;
+          case "paused":
+            this.unpause();
+            break;
+          case "over":
+            this.reset();
+            break;
+        }
+        break;
     }
   }
 
@@ -83,7 +84,7 @@ export default class Controller {
    *  Renders the snake segments and food pellets.
     * @param {String} debugInfo   The debug info to display.
    */
-  render(debugInfo) {
+  render(debugInfo, screenInfo = '') {
     // fill screen
     this.backCTX.save();
     this.backCTX.fillStyle = "black";
@@ -107,9 +108,15 @@ export default class Controller {
     this.food.render(this.backCTX, this.cellSize);
     this.backCTX.restore();
 
+    var gameInfo = `Your Score: ${this.snakes[0].score} - High Score: ${this.highScore} - Extra Lives: ${this.snakes[0].lives.extra}`;
+    var gameInfoDim = this.backCTX.measureText(gameInfo);
+    var debugInfoDim = this.backCTX.measureText(debugInfo);
+    var screenInfoDim = this.backCTX.measureText(screenInfo);
+
     this.backCTX.fillStyle = "orange";
-    this.backCTX.fillText(debugInfo, 10, (this.height + 1) * this.cellSize + 24);
-    this.backCTX.fillText(`Your Score: ${this.snakes[0].score} - High Score: ${this.highScore} - Extra Lives: ${this.snakes[0].lives.extra}`, 10, (this.height + 1) * this.cellSize + 5);
+    this.backCTX.fillText(gameInfo, (this.width / 2) * this.cellSize - gameInfoDim.width / 2, (this.height + 1) * this.cellSize + 5);
+    this.backCTX.fillText(debugInfo, (this.width / 2) * this.cellSize - debugInfoDim.width / 2, (this.height + 1) * this.cellSize + 20);
+    this.backCTX.fillText(screenInfo, (this.width / 2) * this.cellSize - screenInfoDim.width / 2, (this.height / 2) * this.cellSize);
 
     this.screenCTX.drawImage(this.back, 0, 0);
   }
@@ -204,7 +211,6 @@ export default class Controller {
 
     // Replace food if it was consumed
     if (grow.length > 0) {
-      this.food.clearFood();
       this.food.placeFood(this.snakes, this.width, this.height);
 
       this.snakes.forEach((entity) => { entity.setGoal(this.food) });
@@ -217,7 +223,7 @@ export default class Controller {
   pause() {
     this.state = "paused";
     clearInterval(this.loopID);
-    this.render(`Paused - Interval: ${this.speed}`);
+    this.render(`Paused - Interval: ${this.speed}`, "Paused! Hit [P] to unpause.");
   }
 
   /** @function unpause
@@ -249,7 +255,7 @@ export default class Controller {
         this.render(`Running - Interval: ${this.speed}`);
         break;
       case "paused":
-        this.render(`Paused - Interval: ${this.speed}`);
+        this.render(`Paused - Interval: ${this.speed}`, "Paused! Hit [P] to unpause.");
         break;
       case "refresh":
         clearInterval(this.loopID);
@@ -259,7 +265,7 @@ export default class Controller {
         break;
       case "over":
         clearInterval(this.loopID);
-        this.render(`Game Over - Interval: ${this.speed}`);
+        this.render(`Game Over - Interval: ${this.speed}`, "Game Over! Hit [P] to replay.");
         break;
     }
   }

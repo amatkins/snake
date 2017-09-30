@@ -55,11 +55,11 @@ export default class Snake {
         case "closest":
           this.ai.goal = this.findClosest(food.loc);
           break;
-        case "max":
+        case "last":
           this.ai.goal = food.loc.length - 1;
           break;
         case "random":
-          this.ai.goal = Math.round(Math.random() * food.loc.length - 1);
+          this.ai.goal = Math.round(Math.random() * (food.loc.length - 1));
           break;
       }
     }
@@ -239,11 +239,13 @@ export default class Snake {
   checkEat(food) {
     var x = this.segments[0].x;
     var y = this.segments[0].y;
+    var pellet;
 
     // Determine if snake has hit food
     for (let j = 0; j < food.loc.length; j++) {
-      if (food.loc[j].x === x && food.loc[j].y === y) {
-        this.score += food.typ[j].value;
+      pellet = food.eatFood(x, y);
+      if (pellet) {
+        this.score += pellet.value;
 
         if (!this.lives.ignore && (this.segments.length- 1) % (30 * 2 ** this.lives.extra) === 0)
           this.lives.extra++;
@@ -308,31 +310,53 @@ export default class Snake {
    */
   render(ctx, cellSize) {
     var head = this.segments[0];
+    var last = this.segments.length - 1;
 
     ctx.fillStyle = this.color;
 
-    this.segments.forEach((segment) => {
-      ctx.fillRect(segment.x * cellSize, segment.y * cellSize,
-        cellSize, cellSize);
+    this.segments.slice(1, last).forEach((segment) => {
+      ctx.fillRect(segment.x * cellSize, segment.y * cellSize, cellSize, cellSize);
     });
+    ctx.beginPath();
+    ctx.arc((this.segments[last].x + 0.5) * cellSize, (this.segments[last].y + 0.5) * cellSize, cellSize / 2, 0, 2 * Math.PI, true);
+    ctx.fill();
 
-    ctx.fillStyle = "white";
     switch(this.dir.curr) {
       case "up":
-        ctx.fillRect(head.x * cellSize + 1, (head.y + 1) * cellSize - 3, 2, 2);
-        ctx.fillRect((head.x + 1) * cellSize - 3, (head.y + 1) * cellSize - 3, 2, 2);
+        ctx.fillRect(head.x * cellSize, (head.y + 0.5) * cellSize, cellSize, cellSize / 2);
+        ctx.beginPath();
+        ctx.arc((head.x + 0.5) * cellSize, (head.y + 0.5) * cellSize, cellSize / 2, 0, 2 * Math.PI, true);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.fillRect(head.x * cellSize + 2, (head.y + 1) * cellSize - 5, 3, 2);
+        ctx.fillRect((head.x + 1) * cellSize - 5, (head.y + 1) * cellSize - 5, 3, 2);
         break;
       case "left":
-        ctx.fillRect((head.x + 1) * cellSize - 3, head.y * cellSize + 1, 2, 2);
-        ctx.fillRect((head.x + 1) * cellSize - 3, (head.y + 1) * cellSize - 3, 2, 2);
+        ctx.fillRect((head.x + 0.5) * cellSize, head.y * cellSize, cellSize / 2, cellSize);
+        ctx.beginPath();
+        ctx.arc((head.x + 0.5) * cellSize, (head.y + 0.5) * cellSize, cellSize / 2, 0, 2 * Math.PI, true);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.fillRect((head.x + 1) * cellSize - 5, head.y * cellSize + 2, 2, 3);
+        ctx.fillRect((head.x + 1) * cellSize - 5, (head.y + 1) * cellSize - 5, 2, 3);
         break;
       case "down":
-        ctx.fillRect(head.x * cellSize + 1, head.y * cellSize + 1, 2, 2);
-        ctx.fillRect((head.x + 1) * cellSize - 3, head.y * cellSize + 1, 2, 2);
+        ctx.fillRect(head.x * cellSize, head.y * cellSize, cellSize, cellSize / 2);
+        ctx.beginPath();
+        ctx.arc((head.x + 0.5) * cellSize, (head.y + 0.5) * cellSize, cellSize / 2, 0, 2 * Math.PI, true);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.fillRect(head.x * cellSize + 2, head.y * cellSize + 3, 3, 2);
+        ctx.fillRect((head.x + 1) * cellSize - 5, head.y * cellSize + 3, 3, 2);
         break;
       case "right":
-        ctx.fillRect(head.x * cellSize + 1, head.y * cellSize + 1, 2, 2);
-        ctx.fillRect(head.x * cellSize + 1, (head.y + 1) * cellSize - 3, 2, 2);
+        ctx.fillRect(head.x * cellSize, head.y * cellSize, cellSize / 2, cellSize);
+        ctx.beginPath();
+        ctx.arc((head.x + 0.5) * cellSize, (head.y + 0.5) * cellSize, cellSize / 2, 0, 2 * Math.PI, true);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.fillRect(head.x * cellSize + 3, head.y * cellSize + 2, 2, 3);
+        ctx.fillRect(head.x * cellSize + 3, (head.y + 1) * cellSize - 5, 2, 3);
         break;
     }
   }
